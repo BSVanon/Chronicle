@@ -5,6 +5,8 @@
  * This module handles JSON-based BEEF representations.
  */
 
+import { sha256 } from "@noble/hashes/sha256";
+
 export type BeefUtxoRecord = {
   txid: string;
   vout: number;
@@ -73,8 +75,17 @@ export async function scripthashFromScriptHex(scriptHex: string): Promise<string
   for (let i = 0; i < bytes.length; i++) {
     bytes[i] = parseInt(scriptHex.substr(i * 2, 2), 16);
   }
-  const hashBuffer = await crypto.subtle.digest("SHA-256", bytes);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  // Reverse for Electrum-style scripthash
+
+  // Prefer WebCrypto when available.
+  if (typeof crypto !== "undefined" && crypto.subtle && typeof crypto.subtle.digest === "function") {
+    const hashBuffer = await crypto.subtle.digest("SHA-256", bytes);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    // Reverse for Electrum-style scripthash
+    return hashArray.reverse().map((b) => b.toString(16).padStart(2, "0")).join("");
+  }
+
+  // Fallback when WebCrypto is unavailable (e.g. HTTP origin).
+  const hash = sha256(bytes);
+  const hashArray = Array.from(hash);
   return hashArray.reverse().map((b) => b.toString(16).padStart(2, "0")).join("");
 }

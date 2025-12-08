@@ -6,6 +6,7 @@
 
 import type { ProofArchive, BeefIndex } from "./types";
 import { openDb, BEEF_STORE } from "../db";
+import { sha256 } from "@noble/hashes/sha256";
 
 /**
  * Get all BEEF archives.
@@ -120,9 +121,19 @@ export async function verifyBeefIntegrity(): Promise<{
  */
 export async function computeBeefHash(beefBase64: string): Promise<string> {
   const bytes = Uint8Array.from(atob(beefBase64), (c) => c.charCodeAt(0));
-  const hashBuffer = await crypto.subtle.digest("SHA-256", bytes);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+
+  // Prefer WebCrypto when available in a secure context.
+  if (typeof crypto !== "undefined" && crypto.subtle && typeof crypto.subtle.digest === "function") {
+    const hashBuffer = await crypto.subtle.digest("SHA-256", bytes);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+  }
+
+  // Fallback for non-secure contexts (e.g. HTTP) or older browsers.
+  const hash = sha256(bytes);
+  return Array.from(hash)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
 }
 
 /**

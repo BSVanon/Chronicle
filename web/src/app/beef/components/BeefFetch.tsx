@@ -10,6 +10,7 @@ import { useBeefStore } from "@/contexts/beef-store-context";
 import { useDossiers } from "@/contexts/dossier-context";
 import { useNetworkMode } from "@/contexts/network-mode-context";
 import { assembleBeefFromTxid } from "@/core/net/providers";
+import { computeBeefHash } from "@/core/dossier/beef-store";
 import { 
   applyRequestJitter, 
   applyBatchDelay, 
@@ -19,13 +20,6 @@ import {
   getRateLimitStatus,
 } from "@/core/net/privacy-shield";
 import type { ProofArchive } from "@/core/dossier/types";
-
-async function computeBeefHash(beefBase64: string): Promise<string> {
-  const bytes = Uint8Array.from(atob(beefBase64), (c) => c.charCodeAt(0));
-  const hashBuffer = await crypto.subtle.digest("SHA-256", bytes);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
-}
 
 type BeefFetchProps = {
   onStatusChange: (status: string | null) => void;
