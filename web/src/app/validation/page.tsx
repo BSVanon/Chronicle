@@ -13,7 +13,7 @@ import { useDossiers } from "@/contexts/dossier-context";
 import { type VerifyResult } from "@/core/dossier/verify";
 
 import { HeadersSection } from "./components";
-import { BeefVerify, BeefFetch, BeefImport, BeefArchiveList } from "../beef/components";
+import { BeefVerify, BeefFetch, BeefImport, BeefArchiveList, BeefConverter } from "../beef/components";
 
 export default function ValidationPage() {
   return (
@@ -172,6 +172,21 @@ function ValidationPageContent() {
           onRefetchRequest={handleRefetchRequest}
         />
       </div>
+
+      <Separator />
+
+      {/* BEEF Tools (collapsed by default) */}
+      <details className="group">
+        <summary className="cursor-pointer list-none">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+            <span className="transition-transform group-open:rotate-90">▶</span>
+            <span>BEEF Tools</span>
+          </div>
+        </summary>
+        <div className="mt-4">
+          <BeefConverter />
+        </div>
+      </details>
     </div>
   );
 }

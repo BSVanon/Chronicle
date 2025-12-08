@@ -46,3 +46,10 @@ next-env.d.ts
 .contentlayer
 .content-collections
 .source
+
+# local-only (not pushed to GitHub)
+docs/
+sentinel-worker/
+web/Backups/
+web/onchain-dist/
+web/onchain-upload.zip

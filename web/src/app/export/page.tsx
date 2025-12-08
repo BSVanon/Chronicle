@@ -346,7 +346,7 @@ export default function ExportPage() {
                 ) expect raw <strong>hex</strong> BEEF, not the JSON wrapper.
               </li>
               <li>
-                Use the <Link href="/beef" className="underline underline-offset-2">BEEF Format Converter</Link> to
+                Use the <Link href="/validation" className="underline underline-offset-2">BEEF Format Converter</Link> (under BEEF Tools on Validation page) to
                 convert between base64 and hex offline.
               </li>
             </ul>
