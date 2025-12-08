@@ -1,5 +1,5 @@
 /** @type {import('next').NextConfig} */
-const isProd = process.env.NODE_ENV === 'production';
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
 
 const nextConfig = {
   // Export a fully static app.
@@ -10,8 +10,8 @@ const nextConfig = {
   },
   // When hosted on GitHub Pages at https://BSVanon.github.io/Chronicle/,
   // the app lives under the /Chronicle base path. Keep local dev at root.
-  basePath: isProd ? '/Chronicle' : '',
-  assetPrefix: isProd ? '/Chronicle/' : '',
+  basePath,
+  assetPrefix: basePath ? `${basePath}/` : '',
 };
 
 export default nextConfig;

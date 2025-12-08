@@ -12,6 +12,8 @@ import { NetworkModeToggle } from "@/components/network-mode-toggle";
 import { ThemeModeToggle } from "@/components/theme-mode-toggle";
 import { TipJarButton } from "@/components/tip-jar";
 
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -30,9 +32,9 @@ export const metadata: Metadata = {
   description:
     "Chronicle Cold Vault Archive — maintain everything needed to validate and spend your long-term BSV without asking an indexer what you own.",
   icons: {
-    icon: "/favicon.svg",
-    shortcut: "/favicon.svg",
-    apple: "/favicon.svg",
+    icon: `${basePath}/favicon.svg`,
+    shortcut: `${basePath}/favicon.svg`,
+    apple: `${basePath}/favicon.svg`,
   },
 };
 

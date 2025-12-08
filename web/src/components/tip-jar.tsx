@@ -2,6 +2,8 @@
 
 import * as React from "react";
 
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+
 type TipPool = {
   version: number;
   generatedAt: string;
@@ -33,7 +35,7 @@ function TipJarModal({ onClose }: { onClose: () => void }) {
   React.useEffect(() => {
     async function loadPool() {
       try {
-        const res = await fetch("/tips.pool.json");
+        const res = await fetch(`${basePath}/tips.pool.json`);
         if (!res.ok) throw new Error("Failed to load");
         const data: TipPool = await res.json();
         setPaymail(data.fallbackPaymail ?? null);

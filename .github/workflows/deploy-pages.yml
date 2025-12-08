@@ -34,6 +34,8 @@ jobs:
 
       - name: Build static site
         working-directory: web
+        env:
+          NEXT_PUBLIC_BASE_PATH: /Chronicle
         run: npm run build:export
 
       - name: Upload artifact
