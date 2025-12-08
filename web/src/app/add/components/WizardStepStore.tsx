@@ -27,6 +27,7 @@ type WizardStepStoreProps = {
   setLabels: (labels: string) => void;
   onStore: () => void;
   onBack: () => void;
+  existingOutpoints: Set<string>;
 };
 
 export function WizardStepStore({
@@ -42,8 +43,11 @@ export function WizardStepStore({
   setLabels,
   onStore,
   onBack,
+  existingOutpoints,
 }: WizardStepStoreProps) {
   const output = outputs.find((o) => o.vout === selectedVout);
+  const outpoint = `${txid}:${selectedVout}`;
+  const isDuplicate = existingOutpoints.has(outpoint);
 
   return (
     <Card>
@@ -51,21 +55,45 @@ export function WizardStepStore({
         <CardTitle>Store UTXO</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="rounded-md border p-3 text-sm">
+        <div className="rounded-md border p-3 text-sm space-y-1">
           <p>
             <strong>Outpoint:</strong> {txid}:{selectedVout}
           </p>
-          {output && (
+          {output ? (
             <p>
               <strong>Value:</strong> {(output.satoshis / 1e8).toFixed(8)} BSV
             </p>
+          ) : (
+            <p className="text-yellow-600 dark:text-yellow-400">
+              <strong>Value:</strong> Unknown (offline entry)
+            </p>
           )}
-          {beefBase64 && (
+          {beefBase64 ? (
             <p style={{ color: "#16a34a" }}>
               <strong>BEEF:</strong> ✓ Available (height {height})
             </p>
+          ) : (
+            <p className="text-yellow-600 dark:text-yellow-400">
+              <strong>BEEF:</strong> Not available (can fetch later)
+            </p>
           )}
         </div>
+        {!output && (
+          <p className="text-xs text-yellow-600 dark:text-yellow-400">
+            ⚠ Offline entry: BSV balance shown as 0 until you fetch the transaction online.
+          </p>
+        )}
+        {isDuplicate && (
+          <div className="rounded-md border border-orange-500/30 bg-orange-500/10 p-3">
+            <p className="text-sm font-medium text-orange-700 dark:text-orange-400">
+              ⚠ Duplicate UTXO Detected
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              This outpoint already exists in your inventory. Storing will update the existing entry.
+              If you meant to add a different output from the same transaction, go back and select a different vout.
+            </p>
+          </div>
+        )}
 
         <div className="space-y-2">
           <Label>Bucket</Label>

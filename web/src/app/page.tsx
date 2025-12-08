@@ -131,10 +131,14 @@ export default function HomePage() {
           </CardContent>
         </Card>
         
-        <Card title="BEEF (Background Evaluation Extended Format) proofs contain the Merkle path linking your UTXO's transaction to a block header, enabling offline SPV verification.">
+        <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground cursor-help">
+            <CardTitle 
+              className="text-sm font-medium text-muted-foreground cursor-help flex items-center gap-1"
+              title="BEEF (Background Evaluation Extended Format) proofs contain the Merkle path linking your UTXO's transaction to a block header, enabling offline SPV verification."
+            >
               BEEF Coverage
+              <span className="inline-flex items-center justify-center w-4 h-4 text-[10px] rounded-full border border-muted-foreground/50">ⓘ</span>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
@@ -157,10 +161,14 @@ export default function HomePage() {
           </CardContent>
         </Card>
 
-        <Card title="Verified proofs have been checked against locally-stored block headers. This confirms the transaction was included in a mined block, but does NOT prove the UTXO is currently unspent.">
+        <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground cursor-help">
+            <CardTitle 
+              className="text-sm font-medium text-muted-foreground cursor-help flex items-center gap-1"
+              title="Verified proofs have been checked against locally-stored block headers. This confirms the transaction was included in a mined block, but does NOT prove the UTXO is currently unspent."
+            >
               Verified Proofs
+              <span className="inline-flex items-center justify-center w-4 h-4 text-[10px] rounded-full border border-muted-foreground/50">ⓘ</span>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
@@ -190,10 +198,14 @@ export default function HomePage() {
           </CardContent>
         </Card>
 
-        <Card title="Block headers are 80-byte summaries of each block. They contain the Merkle root needed to verify BEEF proofs locally without trusting a third party.">
+        <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground cursor-help">
+            <CardTitle 
+              className="text-sm font-medium text-muted-foreground cursor-help flex items-center gap-1"
+              title="Block headers are 80-byte summaries of each block. They contain the Merkle root needed to verify BEEF proofs locally without trusting a third party."
+            >
               Headers
+              <span className="inline-flex items-center justify-center w-4 h-4 text-[10px] rounded-full border border-muted-foreground/50">ⓘ</span>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">

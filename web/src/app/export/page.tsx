@@ -408,12 +408,12 @@ export default function ExportPage() {
             className="hidden"
           />
 
-          <Button onClick={handleFileSelect} disabled={importing}>
-            {importing ? "Importing..." : "Select & Import Archive"}
+          <Button onClick={handleFileSelect} disabled={importing} className="w-full sm:w-auto">
+            {importing ? "Importing..." : "📁 Select & Import Archive"}
           </Button>
 
           <p className="text-xs text-muted-foreground">
-            Click the button above to select a file. Import starts automatically after selection.
+            Opens a file picker. Import begins automatically once you select a .json or .enc file.
           </p>
           <p className="text-xs text-muted-foreground">
             Note: Importing merges with existing data. Duplicate UTXOs (same outpoint) will be updated, not duplicated.

@@ -26,9 +26,10 @@ type ParsedOutput = {
 
 type UtxoWizardProps = {
   buckets: Bucket[];
+  existingOutpoints: Set<string>;
 };
 
-export function UtxoWizard({ buckets }: UtxoWizardProps) {
+export function UtxoWizard({ buckets, existingOutpoints }: UtxoWizardProps) {
   const { save: saveDossier } = useDossiers();
   const { save: saveBeef } = useBeefStore();
   const { mode, requestOnline } = useNetworkMode();
@@ -291,6 +292,7 @@ export function UtxoWizard({ buckets }: UtxoWizardProps) {
           setLabels={setLabels}
           onStore={handleStore}
           onBack={() => setStep("select-output")}
+          existingOutpoints={existingOutpoints}
         />
       )}
 

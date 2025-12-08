@@ -8,7 +8,13 @@ import { useDossiers } from "@/contexts/dossier-context";
 import { UtxoWizard, BulkCsvImport } from "./components";
 
 export default function AddUtxoPage() {
-  const { buckets, save: saveDossier } = useDossiers();
+  const { buckets, dossiers, save: saveDossier } = useDossiers();
+
+  // Create a set of existing outpoints for duplicate detection
+  const existingOutpoints = React.useMemo(
+    () => new Set(dossiers.map((d) => d.outpoint)),
+    [dossiers]
+  );
 
   return (
     <div className="space-y-6">
@@ -20,7 +26,7 @@ export default function AddUtxoPage() {
       </div>
 
       {/* Main Wizard */}
-      <UtxoWizard buckets={buckets} />
+      <UtxoWizard buckets={buckets} existingOutpoints={existingOutpoints} />
 
       <Separator />
 
