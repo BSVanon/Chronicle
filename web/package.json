@@ -7,9 +7,14 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest"
+    "test": "vitest",
+    "build:export": "next build",
+    "onchain:prep": "node scripts/onchain-prep.mjs",
+    "onchain:zip": "node scripts/zip-onchain.mjs",
+    "onchain:bundle": "npm run build:export && SRC_DIR=out node scripts/onchain-prep.mjs && node scripts/zip-onchain.mjs"
   },
   "dependencies": {
+    "@bsv/sdk": "^1.9.22",
     "@noble/hashes": "^1.5.0",
     "@radix-ui/react-label": "^2.1.8",
     "@radix-ui/react-separator": "^1.1.8",
@@ -20,7 +25,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.553.0",
-    "next": "16.0.3",
+    "next": "^16.0.7",
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "tailwind-merge": "^3.4.0"
@@ -31,11 +36,13 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "babel-plugin-react-compiler": "1.0.0",
+    "baseline-browser-mapping": "^2.9.4",
     "eslint": "^9",
     "eslint-config-next": "16.0.3",
+    "react-onchain": "^1.2.2",
     "tailwindcss": "^4",
     "tw-animate-css": "^1.4.0",
     "typescript": "^5",
-    "vitest": "^2.0.0"
+    "vitest": "^4.0.15"
   }
 }
