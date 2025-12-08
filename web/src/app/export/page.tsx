@@ -32,9 +32,18 @@ export default function ExportPage() {
 
   const [status, setStatus] = React.useState<string | null>(null);
   const [passphrase, setPassphrase] = React.useState("");
-  const [importPassphrase, setImportPassphrase] = React.useState("");
   const [importing, setImporting] = React.useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Import state - two-step flow
+  const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
+  const [showPasswordPrompt, setShowPasswordPrompt] = React.useState(false);
+  const [importPassphrase, setImportPassphrase] = React.useState("");
+  const [importResult, setImportResult] = React.useState<{
+    dossiers: number;
+    beef: number;
+    headers: number;
+  } | null>(null);
 
   // Summary stats
   const totalDossiers = dossiers.length;
@@ -151,25 +160,53 @@ export default function ExportPage() {
     fileInputRef.current?.click();
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Just store the file, don't import yet
+    setSelectedFile(file);
+    setImportResult(null);
+    setStatus(null);
+    setShowPasswordPrompt(false);
+    setImportPassphrase("");
+  };
+
+  const handleClearFile = () => {
+    setSelectedFile(null);
+    setImportResult(null);
+    setShowPasswordPrompt(false);
+    setImportPassphrase("");
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const handleImportClick = async () => {
+    if (!selectedFile) return;
+
+    const isEncrypted = selectedFile.name.endsWith(".enc");
+
+    // If encrypted and no password prompt shown yet, show it
+    if (isEncrypted && !showPasswordPrompt) {
+      setShowPasswordPrompt(true);
+      return;
+    }
+
+    // If encrypted and password prompt shown but no password entered
+    if (isEncrypted && (!importPassphrase || importPassphrase.length < 8)) {
+      setStatus("Please enter the passphrase (min 8 characters).");
+      return;
+    }
+
+    // Proceed with import
     setImporting(true);
     setStatus(null);
 
     try {
-      const isEncrypted = file.name.endsWith(".enc");
-
       if (isEncrypted) {
-        if (!importPassphrase || importPassphrase.length < 8) {
-          setStatus("Please enter the passphrase used to encrypt this archive.");
-          setImporting(false);
-          return;
-        }
-
         // Read encrypted file
-        const arrayBuffer = await file.arrayBuffer();
+        const arrayBuffer = await selectedFile.arrayBuffer();
         const data = new Uint8Array(arrayBuffer);
 
         // Extract salt (16), iv (12), ciphertext
@@ -212,7 +249,7 @@ export default function ExportPage() {
         await importArchive(JSON.parse(json) as ArchiveData);
       } else {
         // Plain JSON
-        const text = await file.text();
+        const text = await selectedFile.text();
         await importArchive(JSON.parse(text) as ArchiveData);
       }
     } catch (e) {
@@ -223,10 +260,6 @@ export default function ExportPage() {
       }
     } finally {
       setImporting(false);
-      // Reset file input
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
     }
   };
 
@@ -271,10 +304,18 @@ export default function ExportPage() {
     await refreshBeef();
     await refreshDossiers();
 
-    setStatus(
-      `Imported ${importedDossiers} dossiers, ${importedBeef} BEEF archives, ${importedHeaders} headers.`
-    );
+    // Set result for confirmation display
+    setImportResult({
+      dossiers: importedDossiers,
+      beef: importedBeef,
+      headers: importedHeaders,
+    });
+    setSelectedFile(null);
+    setShowPasswordPrompt(false);
     setImportPassphrase("");
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   };
 
   return (
@@ -390,16 +431,6 @@ export default function ExportPage() {
             Supports both plain JSON (.json) and encrypted (.enc) archives.
           </p>
 
-          <div className="space-y-2">
-            <Label>Passphrase (for encrypted archives)</Label>
-            <Input
-              type="password"
-              placeholder="Enter passphrase if importing .enc file"
-              value={importPassphrase}
-              onChange={(e) => setImportPassphrase(e.target.value)}
-            />
-          </div>
-
           <input
             ref={fileInputRef}
             type="file"
@@ -408,13 +439,77 @@ export default function ExportPage() {
             className="hidden"
           />
 
-          <Button onClick={handleFileSelect} disabled={importing} className="w-full sm:w-auto">
-            {importing ? "Importing..." : "📁 Select & Import Archive"}
-          </Button>
+          {/* Step 1: Select file */}
+          {!selectedFile && !importResult && (
+            <Button onClick={handleFileSelect} variant="outline" className="w-full sm:w-auto">
+              📁 Select Archive File
+            </Button>
+          )}
 
-          <p className="text-xs text-muted-foreground">
-            Opens a file picker. Import begins automatically once you select a .json or .enc file.
-          </p>
+          {/* Step 2: File selected - show details and import button */}
+          {selectedFile && (
+            <div className="space-y-3">
+              <div className="rounded-md border border-primary/30 bg-primary/5 p-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium">{selectedFile.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {(selectedFile.size / 1024).toFixed(1)} KB
+                      {selectedFile.name.endsWith(".enc") && " • Encrypted"}
+                    </p>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={handleClearFile}>
+                    ✕
+                  </Button>
+                </div>
+              </div>
+
+              {/* Password prompt for encrypted files */}
+              {showPasswordPrompt && (
+                <div className="space-y-2">
+                  <Label>Enter Passphrase</Label>
+                  <Input
+                    type="password"
+                    placeholder="Passphrase used to encrypt this archive"
+                    value={importPassphrase}
+                    onChange={(e) => setImportPassphrase(e.target.value)}
+                    autoFocus
+                  />
+                </div>
+              )}
+
+              <Button 
+                onClick={handleImportClick} 
+                disabled={importing}
+                className="w-full"
+              >
+                {importing ? "Importing..." : "Import Archive"}
+              </Button>
+            </div>
+          )}
+
+          {/* Success confirmation */}
+          {importResult && (
+            <div className="rounded-md border border-green-500/30 bg-green-500/10 p-4 space-y-2">
+              <p className="text-sm font-medium text-green-700 dark:text-green-400">
+                ✓ Import Successful
+              </p>
+              <ul className="text-sm text-muted-foreground space-y-1">
+                <li>• {importResult.dossiers} dossier{importResult.dossiers !== 1 ? "s" : ""} imported</li>
+                <li>• {importResult.beef} BEEF archive{importResult.beef !== 1 ? "s" : ""} imported</li>
+                <li>• {importResult.headers} header{importResult.headers !== 1 ? "s" : ""} imported</li>
+              </ul>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setImportResult(null)}
+                className="mt-2"
+              >
+                Done
+              </Button>
+            </div>
+          )}
+
           <p className="text-xs text-muted-foreground">
             Note: Importing merges with existing data. Duplicate UTXOs (same outpoint) will be updated, not duplicated.
           </p>
