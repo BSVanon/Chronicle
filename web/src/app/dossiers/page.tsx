@@ -13,7 +13,7 @@ import { useDossiers } from "@/contexts/dossier-context";
 import { useBeefStore } from "@/contexts/beef-store-context";
 import type { UtxoDossier, ProofArchive } from "@/core/dossier/types";
 
-type SortOption = "newest" | "oldest" | "value-high" | "value-low";
+type SortOption = "newest" | "oldest" | "value-high" | "value-low" | "label-asc" | "label-desc";
 
 export default function DossiersPage() {
   const { dossiers, buckets, loading, remove, refresh } = useDossiers();
@@ -55,6 +55,16 @@ export default function DossiersPage() {
           return b.value_satoshis - a.value_satoshis;
         case "value-low":
           return a.value_satoshis - b.value_satoshis;
+        case "label-asc": {
+          const aLabel = a.labels[0]?.toLowerCase() ?? "";
+          const bLabel = b.labels[0]?.toLowerCase() ?? "";
+          return aLabel.localeCompare(bLabel);
+        }
+        case "label-desc": {
+          const aLabel = a.labels[0]?.toLowerCase() ?? "";
+          const bLabel = b.labels[0]?.toLowerCase() ?? "";
+          return bLabel.localeCompare(aLabel);
+        }
         default:
           return 0;
       }
@@ -262,6 +272,20 @@ export default function DossiersPage() {
             onClick={() => setSort("value-low")}
           >
             Value ↑
+          </Button>
+          <Button
+            variant={sort === "label-asc" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setSort("label-asc")}
+          >
+            Label A-Z
+          </Button>
+          <Button
+            variant={sort === "label-desc" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setSort("label-desc")}
+          >
+            Label Z-A
           </Button>
         </div>
       </div>

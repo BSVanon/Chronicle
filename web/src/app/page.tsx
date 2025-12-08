@@ -131,9 +131,9 @@ export default function HomePage() {
           </CardContent>
         </Card>
         
-        <Card>
+        <Card title="BEEF (Background Evaluation Extended Format) proofs contain the Merkle path linking your UTXO's transaction to a block header, enabling offline SPV verification.">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle className="text-sm font-medium text-muted-foreground cursor-help">
               BEEF Coverage
             </CardTitle>
           </CardHeader>
@@ -157,9 +157,9 @@ export default function HomePage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card title="Verified proofs have been checked against locally-stored block headers. This confirms the transaction was included in a mined block, but does NOT prove the UTXO is currently unspent.">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle className="text-sm font-medium text-muted-foreground cursor-help">
               Verified Proofs
             </CardTitle>
           </CardHeader>
@@ -190,9 +190,9 @@ export default function HomePage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card title="Block headers are 80-byte summaries of each block. They contain the Merkle root needed to verify BEEF proofs locally without trusting a third party.">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle className="text-sm font-medium text-muted-foreground cursor-help">
               Headers
             </CardTitle>
           </CardHeader>

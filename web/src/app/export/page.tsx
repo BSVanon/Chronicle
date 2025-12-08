@@ -409,11 +409,14 @@ export default function ExportPage() {
           />
 
           <Button onClick={handleFileSelect} disabled={importing}>
-            {importing ? "Importing..." : "Select Archive File"}
+            {importing ? "Importing..." : "Select & Import Archive"}
           </Button>
 
           <p className="text-xs text-muted-foreground">
-            Note: Importing will merge with existing data. Duplicate entries will be updated.
+            Click the button above to select a file. Import starts automatically after selection.
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Note: Importing merges with existing data. Duplicate UTXOs (same outpoint) will be updated, not duplicated.
           </p>
         </CardContent>
       </Card>
