@@ -1,0 +1,5 @@
+{
+  "name": "chron-sent-bd0d",
+  "compatibility_date": "2025-12-05",
+  "main": "src/index.ts"
+}
