@@ -58,6 +58,7 @@ export default function HomePage() {
   const totalFailed = dossiers.filter(d => d.verified?.ok === false).length;
   const totalNotVerified = totalWithBeef - totalVerified; // Has BEEF but not verified yet
   const totalMissingBeef = totalDossiers - totalWithBeef;
+  const totalZeroBalance = dossiers.filter(d => d.value_satoshis === 0).length;
   
   const beefCoveragePercent = totalDossiers === 0 ? 100 : Math.round((totalWithBeef / totalDossiers) * 100);
   const verifiedPercent = totalDossiers === 0 ? 100 : Math.round((totalVerified / totalDossiers) * 100);
@@ -117,17 +118,26 @@ export default function HomePage() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle 
+              className="text-sm font-medium text-muted-foreground cursor-help flex items-center gap-1"
+              title="Balance reflects values recorded when UTXOs were added. Offline entries show 0 BSV. This is NOT a live on-chain balance check."
+            >
               Total Balance
+              <span className="inline-flex items-center justify-center w-4 h-4 text-[10px] rounded-full border border-muted-foreground/50">ⓘ</span>
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-1">
             <p className="text-2xl font-bold">
               {loading ? "..." : (totalSatoshis / 1e8).toFixed(8)} BSV
             </p>
             <p className="text-xs text-muted-foreground">
               {totalDossiers} UTXO{totalDossiers !== 1 ? "s" : ""} across {buckets.length} bucket{buckets.length !== 1 ? "s" : ""}
             </p>
+            {totalZeroBalance > 0 && (
+              <p className="text-xs text-yellow-600 dark:text-yellow-400">
+                {totalZeroBalance} with unknown balance
+              </p>
+            )}
           </CardContent>
         </Card>
         

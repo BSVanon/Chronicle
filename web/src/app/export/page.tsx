@@ -32,7 +32,9 @@ export default function ExportPage() {
 
   const [status, setStatus] = React.useState<string | null>(null);
   const [passphrase, setPassphrase] = React.useState("");
+  const [passphraseError, setPassphraseError] = React.useState<string | null>(null);
   const [importing, setImporting] = React.useState(false);
+  const [importError, setImportError] = React.useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   // Import state - two-step flow
@@ -82,9 +84,10 @@ export default function ExportPage() {
 
   const handleExportEncrypted = async () => {
     setStatus(null);
+    setPassphraseError(null);
 
     if (!passphrase || passphrase.length < 8) {
-      setStatus("Please enter a passphrase of at least 8 characters.");
+      setPassphraseError(`Passphrase must be at least 8 characters (currently ${passphrase.length}).`);
       return;
     }
 
@@ -167,7 +170,7 @@ export default function ExportPage() {
     // Just store the file, don't import yet
     setSelectedFile(file);
     setImportResult(null);
-    setStatus(null);
+    setImportError(null);
     setShowPasswordPrompt(false);
     setImportPassphrase("");
   };
@@ -175,6 +178,7 @@ export default function ExportPage() {
   const handleClearFile = () => {
     setSelectedFile(null);
     setImportResult(null);
+    setImportError(null);
     setShowPasswordPrompt(false);
     setImportPassphrase("");
     if (fileInputRef.current) {
@@ -195,9 +199,11 @@ export default function ExportPage() {
 
     // If encrypted and password prompt shown but no password entered
     if (isEncrypted && (!importPassphrase || importPassphrase.length < 8)) {
-      setStatus("Please enter the passphrase (min 8 characters).");
+      setImportError("Please enter the passphrase (min 8 characters).");
       return;
     }
+
+    setImportError(null);
 
     // Proceed with import
     setImporting(true);
@@ -254,9 +260,9 @@ export default function ExportPage() {
       }
     } catch (e) {
       if (e instanceof DOMException && e.name === "OperationError") {
-        setStatus("Decryption failed. Check your passphrase.");
+        setImportError("Decryption failed. The passphrase is incorrect.");
       } else {
-        setStatus(`Import error: ${e instanceof Error ? e.message : "Unknown"}`);
+        setImportError(`Import error: ${e instanceof Error ? e.message : "Unknown"}`);
       }
     } finally {
       setImporting(false);
@@ -411,8 +417,15 @@ export default function ExportPage() {
               type="password"
               placeholder="Enter passphrase"
               value={passphrase}
-              onChange={(e) => setPassphrase(e.target.value)}
+              onChange={(e) => {
+                setPassphrase(e.target.value);
+                setPassphraseError(null);
+              }}
+              className={passphraseError ? "border-red-500" : ""}
             />
+            {passphraseError && (
+              <p className="text-sm text-red-600 dark:text-red-400">{passphraseError}</p>
+            )}
           </div>
           <Button onClick={handleExportEncrypted}>Export Encrypted</Button>
         </CardContent>
@@ -472,9 +485,20 @@ export default function ExportPage() {
                     type="password"
                     placeholder="Passphrase used to encrypt this archive"
                     value={importPassphrase}
-                    onChange={(e) => setImportPassphrase(e.target.value)}
+                    onChange={(e) => {
+                      setImportPassphrase(e.target.value);
+                      setImportError(null);
+                    }}
                     autoFocus
+                    className={importError ? "border-red-500" : ""}
                   />
+                </div>
+              )}
+
+              {/* Import error */}
+              {importError && (
+                <div className="rounded-md border border-red-500/30 bg-red-500/10 p-3">
+                  <p className="text-sm text-red-700 dark:text-red-400">{importError}</p>
                 </div>
               )}
 

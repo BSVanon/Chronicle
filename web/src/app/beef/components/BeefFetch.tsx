@@ -11,6 +11,7 @@ import { useDossiers } from "@/contexts/dossier-context";
 import { useNetworkMode } from "@/contexts/network-mode-context";
 import { assembleBeefFromTxid } from "@/core/net/providers";
 import { computeBeefHash } from "@/core/dossier/beef-store";
+import { extractBeefOutputs } from "@/core/dossier/verify";
 import { 
   applyRequestJitter, 
   applyBatchDelay, 
@@ -142,20 +143,45 @@ export function BeefFetch({
         return;
       }
 
-      // Try to link to existing dossiers
+      // Try to link to existing dossiers and update balances from BEEF
       let linked = 0;
+      let balancesUpdated = 0;
+      const beefOutputs = extractBeefOutputs(beefBase64);
+      
       for (const dossier of dossiers) {
-        if (dossier.funding_txid === txid && !dossier.beef_hash) {
-          await saveDossier({ ...dossier, beef_hash: beefHash });
-          linked++;
+        if (dossier.funding_txid === txid) {
+          const updates: Partial<typeof dossier> = {};
+          
+          // Link BEEF if not already linked
+          if (!dossier.beef_hash) {
+            updates.beef_hash = beefHash;
+            linked++;
+          }
+          
+          // Update balance if it was 0 (offline entry)
+          if (dossier.value_satoshis === 0) {
+            const [, voutStr] = dossier.outpoint.split(":");
+            const vout = parseInt(voutStr, 10);
+            const output = beefOutputs.find(o => o.txid === txid && o.vout === vout);
+            if (output && output.satoshis > 0) {
+              updates.value_satoshis = output.satoshis;
+              updates.locking_script_hex = output.scriptHex;
+              balancesUpdated++;
+            }
+          }
+          
+          if (Object.keys(updates).length > 0) {
+            await saveDossier({ ...dossier, ...updates });
+          }
         }
       }
 
       setFetchTxid("");
       await refresh();
-      onStatusChange(
-        `BEEF fetched and stored for ${txid.slice(0, 8)}... (height ${result.height})${linked > 0 ? `. Linked to ${linked} dossier(s).` : ""}`
-      );
+      const parts = [`BEEF fetched for ${txid.slice(0, 8)}... (height ${result.height})`];
+      if (linked > 0) parts.push(`linked to ${linked} dossier(s)`);
+      if (balancesUpdated > 0) parts.push(`updated ${balancesUpdated} balance(s)`);
+      onStatusChange(parts.join(". ") + ".");
     } catch (e) {
       onStatusChange(`Fetch error: ${e instanceof Error ? e.message : "Unknown"}`);
     } finally {
@@ -255,9 +281,23 @@ export function BeefFetch({
 
             const saveResult = await save(archive);
             if (saveResult.ok) {
-              // Link to dossiers
+              // Link to dossiers and update balances from BEEF
+              const beefOutputs = extractBeefOutputs(beefBase64);
               for (const dossier of missingBeef.filter((d) => d.funding_txid === txid)) {
-                await saveDossier({ ...dossier, beef_hash: beefHash });
+                const updates: Partial<typeof dossier> = { beef_hash: beefHash };
+                
+                // Update balance if it was 0 (offline entry)
+                if (dossier.value_satoshis === 0) {
+                  const [, voutStr] = dossier.outpoint.split(":");
+                  const vout = parseInt(voutStr, 10);
+                  const output = beefOutputs.find(o => o.txid === txid && o.vout === vout);
+                  if (output && output.satoshis > 0) {
+                    updates.value_satoshis = output.satoshis;
+                    updates.locking_script_hex = output.scriptHex;
+                  }
+                }
+                
+                await saveDossier({ ...dossier, ...updates });
               }
               success++;
             } else {
