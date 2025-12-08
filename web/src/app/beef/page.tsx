@@ -7,7 +7,7 @@ import { useSearchParams } from "next/navigation";
 import { Separator } from "@/components/ui/separator";
 import { type VerifyResult } from "@/core/dossier/verify";
 
-import { BeefImport, BeefFetch, BeefVerify, BeefArchiveList } from "./components";
+import { BeefImport, BeefFetch, BeefVerify, BeefArchiveList, BeefConverter } from "./components";
 
 export default function BeefPage() {
   return (
@@ -85,6 +85,11 @@ function BeefPageContent() {
 
       {/* Import Section */}
       <BeefImport onStatusChange={setStatus} />
+
+      <Separator />
+
+      {/* Format Converter */}
+      <BeefConverter />
 
       <Separator />
 

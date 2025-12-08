@@ -327,6 +327,30 @@ export default function ExportPage() {
             Export everything as a plain JSON archive. Use this for quick backups on trusted devices.
           </p>
           <Button onClick={handleExportPlain}>Export Full Archive (JSON)</Button>
+          <div className="rounded-md border p-3 space-y-2 text-xs text-muted-foreground">
+            <p className="font-medium">About BEEF in Chronicle exports:</p>
+            <ul className="list-disc ml-4 space-y-1">
+              <li>
+                BEEF proofs are stored as <strong>base64-encoded</strong> binary data inside the JSON.
+              </li>
+              <li>
+                Some external tools (e.g.{" "}
+                <a
+                  href="https://beef.bsv.tools/"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline underline-offset-2"
+                >
+                  beef.bsv.tools
+                </a>
+                ) expect raw <strong>hex</strong> BEEF, not the JSON wrapper.
+              </li>
+              <li>
+                Use the <Link href="/beef" className="underline underline-offset-2">BEEF Format Converter</Link> to
+                convert between base64 and hex offline.
+              </li>
+            </ul>
+          </div>
         </CardContent>
       </Card>
 
