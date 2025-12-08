@@ -208,6 +208,36 @@ export default function SettingsPage() {
 
       <Separator />
 
+      {/* Open Source & GitHub */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Open Source & GitHub</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm text-muted-foreground">
+          <p>
+            Chronicle is free and open source. The full source code for this app lives on GitHub
+            so you (or your auditor) can inspect how it works and verify that everything runs
+            locally in your browser.
+          </p>
+          <p>
+            Repo: {" "}
+            <a
+              href="https://github.com/BSVanon/Chronicle"
+              target="_blank"
+              rel="noreferrer"
+              className="font-mono text-xs underline underline-offset-2"
+            >
+              github.com/BSVanon/Chronicle
+            </a>
+          </p>
+          <p className="text-xs">
+            Chronicle never stores keys or seeds, and all data stays in your browser&apos;s
+            storage. For maximum assurance you can build from source and host your own copy
+            (including on an offline machine).
+          </p>
+        </CardContent>
+      </Card>
+
       {/* Danger Zone */}
       <Card className="border-red-500/30">
         <CardHeader>
