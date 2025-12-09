@@ -11,8 +11,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { useDossiers } from "@/contexts/dossier-context";
 import { useBeefStore } from "@/contexts/beef-store-context";
+import { useHeaderStore } from "@/contexts/header-store-context";
 import type { UtxoDossier, ProofArchive } from "@/core/dossier/types";
+import { getHeaderByHeight } from "@/core/headers/store";
 import { Beef } from "@bsv/sdk";
+import { Label } from "@/components/ui/label";
 
 type SortOption = "newest" | "oldest" | "value-high" | "value-low" | "label-asc" | "label-desc";
 
@@ -52,6 +55,7 @@ function getBeefDetails(beefBase64: string): {
 export default function DossiersPage() {
   const { dossiers, buckets, loading, remove, refresh } = useDossiers();
   const { archives } = useBeefStore();
+  const { tipHeight } = useHeaderStore();
 
   const [status, setStatus] = React.useState<string | null>(null);
   const [filter, setFilter] = React.useState<string>("all");
@@ -60,6 +64,10 @@ export default function DossiersPage() {
   const [selected, setSelected] = React.useState<Set<string>>(new Set());
   const [selectMode, setSelectMode] = React.useState(false);
   const [expanded, setExpanded] = React.useState<Set<string>>(new Set());
+  const [showExportModal, setShowExportModal] = React.useState(false);
+  const [exportPassphrase, setExportPassphrase] = React.useState("");
+  const [exportEncrypted, setExportEncrypted] = React.useState(false);
+  const [exporting, setExporting] = React.useState(false);
 
   const toggleExpanded = (outpoint: string) => {
     const newExpanded = new Set(expanded);
@@ -158,59 +166,251 @@ export default function DossiersPage() {
     setSelected(new Set());
   };
 
-  const handleExportSelected = async () => {
+  const handleExportSelected = async (encrypted: boolean = false, passphrase: string = "") => {
     if (selected.size === 0) {
       setStatus("No UTXOs selected for export.");
       return;
     }
 
+    if (encrypted && passphrase.length < 8) {
+      setStatus("Passphrase must be at least 8 characters.");
+      return;
+    }
+
+    setExporting(true);
+
     try {
       const selectedDossiers = dossiers.filter((d) => selected.has(d.outpoint));
-      const relatedArchives: ProofArchive[] = [];
-
-      // Get BEEF archives for selected dossiers
+      
+      // Build self-contained UTXO records with embedded BEEF
+      const utxoRecords = [];
+      const relevantHeights = new Set<number>();
+      
       for (const dossier of selectedDossiers) {
-        if (dossier.beef_hash) {
-          const archive = archives.find((a) => a.beef_hash === dossier.beef_hash);
-          if (archive) {
-            relatedArchives.push(archive);
-          }
+        const archive = dossier.beef_hash 
+          ? archives.find((a) => a.beef_hash === dossier.beef_hash)
+          : undefined;
+        
+        // Extract txid and vout from outpoint
+        const [txid, voutStr] = dossier.outpoint.split(":");
+        const vout = parseInt(voutStr, 10);
+        
+        // Track block heights for header inclusion
+        if (archive?.height) {
+          relevantHeights.add(archive.height);
+        }
+        
+        utxoRecords.push({
+          // Core UTXO identification
+          outpoint: dossier.outpoint,
+          txid,
+          vout,
+          
+          // Value and script (needed to spend)
+          satoshis: dossier.value_satoshis,
+          locking_script_hex: dossier.locking_script_hex,
+          
+          // BEEF proof (self-contained verification)
+          beef: archive?.beef ?? null,
+          beef_hash: dossier.beef_hash ?? null,
+          
+          // Block context
+          block_height: archive?.height ?? null,
+          block_hash: archive?.header_hash ?? null,
+          
+          // Metadata
+          bucket: dossier.bucket,
+          labels: dossier.labels,
+          created_at: dossier.created_at,
+          
+          // Verification status at export time
+          verified: dossier.verified?.ok ?? null,
+        });
+      }
+      
+      // Fetch relevant headers for offline verification
+      const relevantHeaders: Array<{height: number; hash: string; raw: string}> = [];
+      for (const height of relevantHeights) {
+        const header = await getHeaderByHeight(height);
+        if (header) {
+          relevantHeaders.push({
+            height: header.height,
+            hash: header.hash,
+            raw: header.header_hex,
+          });
         }
       }
 
       const exportData = {
-        version: 1,
+        // Format identification
+        version: 2,
+        format: "chronicle-utxo-bundle",
         exported_at: new Date().toISOString(),
-        type: "utxo_bundle",
-        dossiers: selectedDossiers,
-        beef_archives: relatedArchives,
+        
+        // Self-contained UTXO records
+        utxos: utxoRecords,
+        
+        // Headers for offline verification
+        headers: {
+          tip_height: tipHeight,
+          relevant: relevantHeaders,
+        },
+        
+        // Summary for quick reference
         summary: {
-          utxo_count: selectedDossiers.length,
-          total_satoshis: selectedDossiers.reduce((sum, d) => sum + d.value_satoshis, 0),
-          with_beef: selectedDossiers.filter((d) => d.beef_hash).length,
-          verified: selectedDossiers.filter((d) => d.verified?.ok).length,
+          utxo_count: utxoRecords.length,
+          total_satoshis: utxoRecords.reduce((sum, u) => sum + u.satoshis, 0),
+          with_beef: utxoRecords.filter((u) => u.beef).length,
+          verified: utxoRecords.filter((u) => u.verified).length,
+          headers_included: relevantHeaders.length,
+        },
+        
+        // Documentation for future readers
+        _documentation: {
+          format_description: "Chronicle Cold Vault UTXO Bundle - self-contained export for long-term storage",
+          beef_format: "BRC-62 BEEF (Background Evaluation Extended Format) - base64 encoded",
+          verification: "Each UTXO's beef field contains a complete Merkle proof. Use the included headers to verify locally.",
+          spending: "To spend, you need: txid, vout, satoshis, locking_script_hex, and your private key",
         },
       };
 
       const json = JSON.stringify(exportData, null, 2);
-      const blob = new Blob([json], { type: "application/json" });
+      
+      let blob: Blob;
+      let filename: string;
+      
+      if (encrypted) {
+        // Encrypt with AES-GCM
+        const encoder = new TextEncoder();
+        const salt = crypto.getRandomValues(new Uint8Array(16));
+        const iv = crypto.getRandomValues(new Uint8Array(12));
+        
+        const keyMaterial = await crypto.subtle.importKey(
+          "raw",
+          encoder.encode(passphrase),
+          "PBKDF2",
+          false,
+          ["deriveBits", "deriveKey"]
+        );
+        
+        const key = await crypto.subtle.deriveKey(
+          { name: "PBKDF2", salt, iterations: 100000, hash: "SHA-256" },
+          keyMaterial,
+          { name: "AES-GCM", length: 256 },
+          false,
+          ["encrypt"]
+        );
+        
+        const encrypted_data = await crypto.subtle.encrypt(
+          { name: "AES-GCM", iv },
+          key,
+          encoder.encode(json)
+        );
+        
+        // Combine salt + iv + ciphertext
+        const result = new Uint8Array(salt.length + iv.length + encrypted_data.byteLength);
+        result.set(salt, 0);
+        result.set(iv, salt.length);
+        result.set(new Uint8Array(encrypted_data), salt.length + iv.length);
+        
+        blob = new Blob([result], { type: "application/octet-stream" });
+        filename = `chronicle-utxos-${selected.size}-${new Date().toISOString().slice(0, 10)}.enc`;
+      } else {
+        blob = new Blob([json], { type: "application/json" });
+        filename = `chronicle-utxos-${selected.size}-${new Date().toISOString().slice(0, 10)}.json`;
+      }
+      
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `chronicle-utxos-${selected.size}-${new Date().toISOString().slice(0, 10)}.json`;
+      a.download = filename;
       a.click();
       URL.revokeObjectURL(url);
 
-      setStatus(`Exported ${selected.size} UTXO(s) with ${relatedArchives.length} BEEF archive(s).`);
+      setStatus(`Exported ${selected.size} UTXO(s) with ${relevantHeaders.length} header(s)${encrypted ? " (encrypted)" : ""}.`);
       setSelectMode(false);
       setSelected(new Set());
+      setShowExportModal(false);
+      setExportPassphrase("");
+      setExportEncrypted(false);
     } catch (e) {
       setStatus(`Export error: ${e instanceof Error ? e.message : "Unknown"}`);
+    } finally {
+      setExporting(false);
     }
+  };
+  
+  const openExportModal = () => {
+    if (selected.size === 0) {
+      setStatus("No UTXOs selected for export.");
+      return;
+    }
+    setShowExportModal(true);
   };
 
   return (
     <div className="space-y-6">
+      {/* Export Modal */}
+      {showExportModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <Card className="w-full max-w-md mx-4">
+            <CardHeader>
+              <CardTitle>Export {selected.size} UTXO(s)</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Export creates a self-contained bundle with BEEF proofs and relevant headers for offline verification.
+              </p>
+              
+              <div className="flex items-center gap-2">
+                <Checkbox 
+                  id="encrypt-export"
+                  checked={exportEncrypted}
+                  onCheckedChange={(checked) => setExportEncrypted(checked === true)}
+                />
+                <Label htmlFor="encrypt-export" className="text-sm cursor-pointer">
+                  Encrypt with passphrase
+                </Label>
+              </div>
+              
+              {exportEncrypted && (
+                <div className="space-y-2">
+                  <Label htmlFor="export-passphrase">Passphrase (min 8 characters)</Label>
+                  <Input
+                    id="export-passphrase"
+                    type="password"
+                    value={exportPassphrase}
+                    onChange={(e) => setExportPassphrase(e.target.value)}
+                    placeholder="Enter passphrase..."
+                    autoComplete="new-password"
+                  />
+                </div>
+              )}
+              
+              <div className="flex gap-2 justify-end">
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setShowExportModal(false);
+                    setExportPassphrase("");
+                    setExportEncrypted(false);
+                  }}
+                  disabled={exporting}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={() => handleExportSelected(exportEncrypted, exportPassphrase)}
+                  disabled={exporting || (exportEncrypted && exportPassphrase.length < 8)}
+                >
+                  {exporting ? "Exporting..." : exportEncrypted ? "Export Encrypted" : "Export Plain"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       <div className="space-y-2">
         <h1 className="text-2xl font-semibold tracking-tight">UTXO Dossiers</h1>
         <p className="text-sm text-muted-foreground">
@@ -353,7 +553,7 @@ export default function DossiersPage() {
           </Button>
           <Button 
             size="sm" 
-            onClick={handleExportSelected}
+            onClick={openExportModal}
             disabled={selected.size === 0}
           >
             Export Selected

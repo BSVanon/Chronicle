@@ -125,17 +125,55 @@ export function UtxoWizard({ buckets, existingOutpoints }: UtxoWizardProps) {
     } else if (inputType === "beef") {
       try {
         const parsed = JSON.parse(value);
-        if (!parsed.txid || !parsed.beef) {
-          setError("Invalid BEEF format. Expected {txid, beef, ...}");
+        
+        // Support multiple formats:
+        // 1. Simple BEEF: {txid, beef, height?, utxos?}
+        // 2. Chronicle bundle single UTXO: {outpoint, txid, beef, satoshis, ...}
+        // 3. Chronicle bundle array: {utxos: [{outpoint, txid, beef, ...}]}
+        
+        if (parsed.format === "chronicle-utxo-bundle" && Array.isArray(parsed.utxos)) {
+          // Chronicle bundle format - take first UTXO
+          if (parsed.utxos.length === 0) {
+            setError("Bundle contains no UTXOs.");
+            return;
+          }
+          if (parsed.utxos.length > 1) {
+            setError(`Bundle contains ${parsed.utxos.length} UTXOs. Please import via Export page for bulk import, or paste a single UTXO record.`);
+            return;
+          }
+          const utxo = parsed.utxos[0];
+          setTxid(utxo.txid);
+          setBeefBase64(utxo.beef ?? "");
+          setHeight(utxo.block_height ?? null);
+          setHeaderHash(utxo.block_hash ?? null);
+          setOutputs(utxo.satoshis ? [{ vout: utxo.vout ?? 0, satoshis: utxo.satoshis, script_hex: utxo.locking_script_hex ?? "" }] : []);
+          setSelectedVout(utxo.vout ?? 0);
+          setSelectedBucket(utxo.bucket ?? buckets[0]?.id ?? "default");
+          setLabels(utxo.labels?.join(", ") ?? "");
+          setStep("select-output");
+        } else if (parsed.outpoint && parsed.txid && parsed.beef) {
+          // Single Chronicle UTXO record
+          setTxid(parsed.txid);
+          setBeefBase64(parsed.beef);
+          setHeight(parsed.block_height ?? null);
+          setHeaderHash(parsed.block_hash ?? null);
+          setOutputs(parsed.satoshis ? [{ vout: parsed.vout ?? 0, satoshis: parsed.satoshis, script_hex: parsed.locking_script_hex ?? "" }] : []);
+          setSelectedVout(parsed.vout ?? 0);
+          setSelectedBucket(parsed.bucket ?? buckets[0]?.id ?? "default");
+          setLabels(parsed.labels?.join(", ") ?? "");
+          setStep("select-output");
+        } else if (parsed.txid && parsed.beef) {
+          // Simple BEEF format
+          setTxid(parsed.txid);
+          setBeefBase64(parsed.beef);
+          setHeight(parsed.height ?? null);
+          setHeaderHash(parsed.header_hash ?? null);
+          setOutputs(parsed.utxos ?? []);
+          setStep("select-output");
+        } else {
+          setError("Invalid BEEF format. Expected {txid, beef, ...} or Chronicle bundle format.");
           return;
         }
-
-        setTxid(parsed.txid);
-        setBeefBase64(parsed.beef);
-        setHeight(parsed.height ?? null);
-        setHeaderHash(parsed.header_hash ?? null);
-        setOutputs(parsed.utxos ?? []);
-        setStep("select-output");
       } catch {
         setError("Invalid JSON format.");
       }
