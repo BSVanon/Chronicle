@@ -96,4 +96,4 @@ Always verify the build and host Chronicle somewhere you control if you have a h
 
 ## License
 
-TBD.
+Open BSV
