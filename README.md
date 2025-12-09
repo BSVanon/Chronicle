@@ -19,7 +19,7 @@ Chronicle is **offline-first**:
 
 The latest build of Chronicle is published via GitHub Pages at:
 
-- https://bsvanon.github.io/Chronicle/
+- (https://chronicle.nullify.onl/)
 
 You can also run it on your own domain via a CNAME pointing at `bsvanon.github.io`.
 
