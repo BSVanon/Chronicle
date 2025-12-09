@@ -69,6 +69,12 @@ export default function DossiersPage() {
   const [exportPassphrase, setExportPassphrase] = React.useState("");
   const [exportEncrypted, setExportEncrypted] = React.useState(false);
   const [exporting, setExporting] = React.useState(false);
+  const [displayCount, setDisplayCount] = React.useState(50); // Pagination: show 50 at a time
+  
+  // Reset display count when filter changes
+  React.useEffect(() => {
+    setDisplayCount(50);
+  }, [filter, search, sort]);
 
   const toggleExpanded = (outpoint: string) => {
     const newExpanded = new Set(expanded);
@@ -456,10 +462,24 @@ UTXOs: ${selected.size}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-wrap items-center gap-4">
           <Badge variant="outline">
-            {loading ? "..." : `${dossiers.length} dossiers`}
+            {loading ? "..." : filter !== "all" 
+              ? `${filteredDossiers.length} of ${dossiers.length} dossiers`
+              : `${dossiers.length} dossiers`
+            }
           </Badge>
-          <Badge variant="outline">
-            {(dossiers.reduce((sum, d) => sum + d.value_satoshis, 0) / 1e8).toFixed(8)} BSV
+          <Badge 
+            variant="outline"
+            title={filter !== "all" 
+              ? `Showing balance for "${getBucketLabel(filter)}" bucket only. Total across all buckets: ${(dossiers.reduce((sum, d) => sum + d.value_satoshis, 0) / 1e8).toFixed(8)} BSV`
+              : "Total balance across all buckets"
+            }
+            className="cursor-help"
+          >
+            {filter !== "all" 
+              ? `${(filteredDossiers.reduce((sum, d) => sum + d.value_satoshis, 0) / 1e8).toFixed(8)} BSV`
+              : `${(dossiers.reduce((sum, d) => sum + d.value_satoshis, 0) / 1e8).toFixed(8)} BSV`
+            }
+            {filter !== "all" && <span className="ml-1 text-xs opacity-60">(filtered)</span>}
           </Badge>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -605,7 +625,7 @@ UTXOs: ${selected.size}
           <p className="text-sm text-muted-foreground">No dossiers found.</p>
         ) : (
           <div className="space-y-2">
-            {filteredDossiers.map((dossier) => {
+            {filteredDossiers.slice(0, displayCount).map((dossier) => {
               const archive = getArchive(dossier);
               const isExpanded = expanded.has(dossier.outpoint);
               const beefDetails = isExpanded && archive ? getBeefDetails(archive.beef) : null;
@@ -747,6 +767,36 @@ UTXOs: ${selected.size}
               </Card>
               );
             })}
+            
+            {/* Load More / Pagination */}
+            {filteredDossiers.length > displayCount && (
+              <div className="flex flex-col items-center gap-2 pt-4">
+                <p className="text-sm text-muted-foreground">
+                  Showing {displayCount} of {filteredDossiers.length} dossiers
+                </p>
+                <div className="flex gap-2">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setDisplayCount(prev => prev + 50)}
+                  >
+                    Load 50 More
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setDisplayCount(filteredDossiers.length)}
+                  >
+                    Show All ({filteredDossiers.length})
+                  </Button>
+                </div>
+              </div>
+            )}
+            
+            {/* End of list indicator */}
+            {filteredDossiers.length > 0 && displayCount >= filteredDossiers.length && filteredDossiers.length > 50 && (
+              <p className="text-center text-sm text-muted-foreground pt-4">
+                — End of list ({filteredDossiers.length} dossiers) —
+              </p>
+            )}
           </div>
         )}
       </div>
