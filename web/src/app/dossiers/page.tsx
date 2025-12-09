@@ -384,6 +384,17 @@ export default function DossiersPage() {
                     placeholder="Enter passphrase..."
                     autoComplete="new-password"
                   />
+                  <p className="text-xs text-muted-foreground">
+                    💡 Save the{" "}
+                    <a 
+                      href="/decrypt-tool.html" 
+                      target="_blank" 
+                      className="text-primary underline"
+                    >
+                      standalone decryption tool
+                    </a>{" "}
+                    alongside your encrypted backup for future access without Chronicle.
+                  </p>
                 </div>
               )}
               

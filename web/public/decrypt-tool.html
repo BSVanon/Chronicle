@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chronicle Decryption Tool</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 2rem;
+      background: #0a0a0a;
+      color: #e5e5e5;
+      line-height: 1.6;
+    }
+    h1 { color: #f97316; margin-bottom: 0.5rem; }
+    .subtitle { color: #737373; margin-bottom: 2rem; }
+    .card {
+      background: #171717;
+      border: 1px solid #262626;
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    label { display: block; margin-bottom: 0.5rem; font-weight: 500; }
+    input[type="file"], input[type="password"] {
+      width: 100%;
+      padding: 0.75rem;
+      border: 1px solid #404040;
+      border-radius: 6px;
+      background: #262626;
+      color: #e5e5e5;
+      margin-bottom: 1rem;
+    }
+    input[type="file"]::-webkit-file-upload-button {
+      background: #404040;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      color: #e5e5e5;
+      cursor: pointer;
+      margin-right: 1rem;
+    }
+    button {
+      background: #f97316;
+      color: white;
+      border: none;
+      padding: 0.75rem 1.5rem;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-right: 0.5rem;
+    }
+    button:hover { background: #ea580c; }
+    button:disabled { background: #404040; cursor: not-allowed; }
+    button.secondary { background: #404040; }
+    button.secondary:hover { background: #525252; }
+    .status {
+      padding: 1rem;
+      border-radius: 6px;
+      margin-top: 1rem;
+    }
+    .status.error { background: #7f1d1d; border: 1px solid #dc2626; }
+    .status.success { background: #14532d; border: 1px solid #22c55e; }
+    .output {
+      background: #0a0a0a;
+      border: 1px solid #404040;
+      border-radius: 6px;
+      padding: 1rem;
+      max-height: 400px;
+      overflow: auto;
+      font-family: monospace;
+      font-size: 0.875rem;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .info {
+      background: #1e3a5f;
+      border: 1px solid #3b82f6;
+      border-radius: 6px;
+      padding: 1rem;
+      margin-bottom: 1.5rem;
+      font-size: 0.875rem;
+    }
+    .info h3 { margin: 0 0 0.5rem 0; color: #60a5fa; }
+    details { margin-top: 1rem; }
+    summary { cursor: pointer; color: #f97316; }
+  </style>
+</head>
+<body>
+  <h1>🔓 Chronicle Decryption Tool</h1>
+  <p class="subtitle">Standalone tool to decrypt Chronicle Cold Vault encrypted exports (.enc files)</p>
+
+  <div class="info">
+    <h3>ℹ️ About This Tool</h3>
+    <p>This is a standalone HTML file that can decrypt Chronicle encrypted exports without needing the Chronicle application. 
+    Save this file alongside your encrypted backups for long-term archival.</p>
+    <p><strong>Encryption:</strong> AES-256-GCM with PBKDF2 key derivation (100,000 iterations, SHA-256)</p>
+  </div>
+
+  <div class="card">
+    <label for="file">Encrypted File (.enc)</label>
+    <input type="file" id="file" accept=".enc">
+    
+    <label for="passphrase">Passphrase</label>
+    <input type="password" id="passphrase" placeholder="Enter your passphrase...">
+    
+    <button id="decrypt" disabled>Decrypt</button>
+    <button id="download" class="secondary" disabled>Download JSON</button>
+    
+    <div id="status" class="status" style="display: none;"></div>
+  </div>
+
+  <div class="card" id="output-card" style="display: none;">
+    <label>Decrypted Content</label>
+    <div id="output" class="output"></div>
+    
+    <details>
+      <summary>View Summary</summary>
+      <div id="summary" style="margin-top: 1rem;"></div>
+    </details>
+  </div>
+
+  <script>
+    const fileInput = document.getElementById('file');
+    const passphraseInput = document.getElementById('passphrase');
+    const decryptBtn = document.getElementById('decrypt');
+    const downloadBtn = document.getElementById('download');
+    const statusDiv = document.getElementById('status');
+    const outputCard = document.getElementById('output-card');
+    const outputDiv = document.getElementById('output');
+    const summaryDiv = document.getElementById('summary');
+
+    let decryptedData = null;
+
+    function updateButtonState() {
+      decryptBtn.disabled = !fileInput.files?.length || !passphraseInput.value;
+    }
+
+    fileInput.addEventListener('change', updateButtonState);
+    passphraseInput.addEventListener('input', updateButtonState);
+
+    function showStatus(message, isError = false) {
+      statusDiv.style.display = 'block';
+      statusDiv.className = 'status ' + (isError ? 'error' : 'success');
+      statusDiv.textContent = message;
+    }
+
+    decryptBtn.addEventListener('click', async () => {
+      const file = fileInput.files[0];
+      const passphrase = passphraseInput.value;
+
+      if (!file || !passphrase) return;
+
+      try {
+        decryptBtn.disabled = true;
+        decryptBtn.textContent = 'Decrypting...';
+
+        const arrayBuffer = await file.arrayBuffer();
+        const data = new Uint8Array(arrayBuffer);
+
+        // Extract salt (16 bytes), iv (12 bytes), ciphertext (rest)
+        const salt = data.slice(0, 16);
+        const iv = data.slice(16, 28);
+        const ciphertext = data.slice(28);
+
+        // Derive key using PBKDF2
+        const encoder = new TextEncoder();
+        const keyMaterial = await crypto.subtle.importKey(
+          'raw',
+          encoder.encode(passphrase),
+          'PBKDF2',
+          false,
+          ['deriveBits', 'deriveKey']
+        );
+
+        const key = await crypto.subtle.deriveKey(
+          { name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' },
+          keyMaterial,
+          { name: 'AES-GCM', length: 256 },
+          false,
+          ['decrypt']
+        );
+
+        // Decrypt
+        const decrypted = await crypto.subtle.decrypt(
+          { name: 'AES-GCM', iv },
+          key,
+          ciphertext
+        );
+
+        const decoder = new TextDecoder();
+        const jsonString = decoder.decode(decrypted);
+        decryptedData = JSON.parse(jsonString);
+
+        // Display
+        outputDiv.textContent = JSON.stringify(decryptedData, null, 2);
+        outputCard.style.display = 'block';
+        downloadBtn.disabled = false;
+
+        // Show summary
+        if (decryptedData.summary) {
+          const s = decryptedData.summary;
+          summaryDiv.innerHTML = `
+            <p><strong>UTXOs:</strong> ${s.utxo_count}</p>
+            <p><strong>Total:</strong> ${(s.total_satoshis / 1e8).toFixed(8)} BSV</p>
+            <p><strong>With BEEF:</strong> ${s.with_beef}</p>
+            <p><strong>Verified:</strong> ${s.verified}</p>
+            <p><strong>Headers Included:</strong> ${s.headers_included || 0}</p>
+          `;
+        }
+
+        showStatus('✓ Decryption successful!');
+      } catch (e) {
+        showStatus('✗ Decryption failed. Wrong passphrase or corrupted file.', true);
+        console.error(e);
+      } finally {
+        decryptBtn.disabled = false;
+        decryptBtn.textContent = 'Decrypt';
+        updateButtonState();
+      }
+    });
+
+    downloadBtn.addEventListener('click', () => {
+      if (!decryptedData) return;
+
+      const json = JSON.stringify(decryptedData, null, 2);
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileInput.files[0].name.replace('.enc', '.json');
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+  </script>
+</body>
+</html>

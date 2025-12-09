@@ -146,22 +146,52 @@ export function UtxoWizard({ buckets, existingOutpoints }: UtxoWizardProps) {
           setBeefBase64(utxo.beef ?? "");
           setHeight(utxo.block_height ?? null);
           setHeaderHash(utxo.block_hash ?? null);
-          setOutputs(utxo.satoshis ? [{ vout: utxo.vout ?? 0, satoshis: utxo.satoshis, script_hex: utxo.locking_script_hex ?? "" }] : []);
-          setSelectedVout(utxo.vout ?? 0);
-          setSelectedBucket(utxo.bucket ?? buckets[0]?.id ?? "default");
-          setLabels(utxo.labels?.join(", ") ?? "");
-          setStep("select-output");
+          
+          // Chronicle bundles have complete data - set outputs and skip to store step
+          if (utxo.satoshis !== undefined && utxo.satoshis !== null) {
+            setOutputs([{ 
+              vout: utxo.vout ?? 0, 
+              satoshis: utxo.satoshis, 
+              script_hex: utxo.locking_script_hex ?? "" 
+            }]);
+            setSelectedVout(utxo.vout ?? 0);
+            setSelectedBucket(utxo.bucket ?? buckets[0]?.id ?? "default");
+            setLabels(utxo.labels?.join(", ") ?? "");
+            // Skip output selection - we have complete data
+            setStep("store");
+          } else {
+            setOutputs([]);
+            setSelectedVout(utxo.vout ?? 0);
+            setSelectedBucket(utxo.bucket ?? buckets[0]?.id ?? "default");
+            setLabels(utxo.labels?.join(", ") ?? "");
+            setStep("select-output");
+          }
         } else if (parsed.outpoint && parsed.txid && parsed.beef) {
-          // Single Chronicle UTXO record
+          // Single Chronicle UTXO record (extracted from bundle)
           setTxid(parsed.txid);
           setBeefBase64(parsed.beef);
           setHeight(parsed.block_height ?? null);
           setHeaderHash(parsed.block_hash ?? null);
-          setOutputs(parsed.satoshis ? [{ vout: parsed.vout ?? 0, satoshis: parsed.satoshis, script_hex: parsed.locking_script_hex ?? "" }] : []);
-          setSelectedVout(parsed.vout ?? 0);
-          setSelectedBucket(parsed.bucket ?? buckets[0]?.id ?? "default");
-          setLabels(parsed.labels?.join(", ") ?? "");
-          setStep("select-output");
+          
+          // Chronicle records have complete data - skip to store step
+          if (parsed.satoshis !== undefined && parsed.satoshis !== null) {
+            setOutputs([{ 
+              vout: parsed.vout ?? 0, 
+              satoshis: parsed.satoshis, 
+              script_hex: parsed.locking_script_hex ?? "" 
+            }]);
+            setSelectedVout(parsed.vout ?? 0);
+            setSelectedBucket(parsed.bucket ?? buckets[0]?.id ?? "default");
+            setLabels(parsed.labels?.join(", ") ?? "");
+            // Skip output selection - we have complete data
+            setStep("store");
+          } else {
+            setOutputs([]);
+            setSelectedVout(parsed.vout ?? 0);
+            setSelectedBucket(parsed.bucket ?? buckets[0]?.id ?? "default");
+            setLabels(parsed.labels?.join(", ") ?? "");
+            setStep("select-output");
+          }
         } else if (parsed.txid && parsed.beef) {
           // Simple BEEF format
           setTxid(parsed.txid);
