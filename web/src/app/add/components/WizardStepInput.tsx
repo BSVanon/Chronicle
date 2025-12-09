@@ -68,6 +68,9 @@ export function WizardStepInput({
               placeholder="abc123...def or abc123...def:0"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !fetching) onContinue();
+              }}
               className="font-mono text-xs"
             />
             <p className="text-xs text-muted-foreground">

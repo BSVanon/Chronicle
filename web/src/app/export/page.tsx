@@ -421,6 +421,9 @@ export default function ExportPage() {
                 setPassphrase(e.target.value);
                 setPassphraseError(null);
               }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleExportEncrypted();
+              }}
               className={passphraseError ? "border-red-500" : ""}
             />
             {passphraseError && (
@@ -488,6 +491,9 @@ export default function ExportPage() {
                     onChange={(e) => {
                       setImportPassphrase(e.target.value);
                       setImportError(null);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleImportClick();
                     }}
                     autoFocus
                     className={importError ? "border-red-500" : ""}

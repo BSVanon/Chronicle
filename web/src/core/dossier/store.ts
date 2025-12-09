@@ -7,17 +7,36 @@
 import type { UtxoDossier, BucketSummary } from "./types";
 import { openDb, DOSSIER_STORE } from "../db";
 
+// Debug logging
+const STORE_DEBUG = typeof window !== "undefined" && localStorage.getItem("chronicle-db-debug") === "true";
+
+function storeLog(...args: unknown[]) {
+  if (STORE_DEBUG) {
+    console.log("[Chronicle Dossier Store]", new Date().toISOString(), ...args);
+  }
+}
+
 /**
  * Get all dossiers.
  */
 export async function getAllDossiers(): Promise<UtxoDossier[]> {
+  storeLog("getAllDossiers: starting");
   const db = await openDb();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(DOSSIER_STORE, "readonly");
     const store = tx.objectStore(DOSSIER_STORE);
     const request = store.getAll();
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      storeLog("getAllDossiers: found", request.result.length, "dossiers");
+      resolve(request.result);
+    };
+    request.onerror = () => {
+      console.error("[Chronicle Dossier Store] getAllDossiers error:", request.error);
+      reject(request.error);
+    };
+    tx.onerror = () => {
+      console.error("[Chronicle Dossier Store] getAllDossiers transaction error:", tx.error);
+    };
   });
 }
 
@@ -54,13 +73,26 @@ export async function getDossier(outpoint: string): Promise<UtxoDossier | null> 
  * Save a dossier (insert or update).
  */
 export async function saveDossier(dossier: UtxoDossier): Promise<void> {
+  storeLog("saveDossier: saving", dossier.outpoint);
   const db = await openDb();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(DOSSIER_STORE, "readwrite");
     const store = tx.objectStore(DOSSIER_STORE);
     const request = store.put(dossier);
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      storeLog("saveDossier: saved", dossier.outpoint);
+      resolve();
+    };
+    request.onerror = () => {
+      console.error("[Chronicle Dossier Store] saveDossier error:", request.error, "outpoint:", dossier.outpoint);
+      reject(request.error);
+    };
+    tx.onerror = () => {
+      console.error("[Chronicle Dossier Store] saveDossier transaction error:", tx.error);
+    };
+    tx.oncomplete = () => {
+      storeLog("saveDossier: transaction complete for", dossier.outpoint);
+    };
   });
 }
 
@@ -68,13 +100,20 @@ export async function saveDossier(dossier: UtxoDossier): Promise<void> {
  * Delete a dossier by outpoint.
  */
 export async function deleteDossier(outpoint: string): Promise<void> {
+  storeLog("deleteDossier: deleting", outpoint);
   const db = await openDb();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(DOSSIER_STORE, "readwrite");
     const store = tx.objectStore(DOSSIER_STORE);
     const request = store.delete(outpoint);
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      storeLog("deleteDossier: deleted", outpoint);
+      resolve();
+    };
+    request.onerror = () => {
+      console.error("[Chronicle Dossier Store] deleteDossier error:", request.error);
+      reject(request.error);
+    };
   });
 }
 

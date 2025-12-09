@@ -117,6 +117,9 @@ export function WizardStepStore({
             placeholder="vault, cold-storage"
             value={labels}
             onChange={(e) => setLabels(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") onStore();
+            }}
           />
         </div>
 

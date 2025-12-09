@@ -196,6 +196,9 @@ export default function SettingsPage() {
                   placeholder="e.g., Cold-C"
                   value={newBucketLabel}
                   onChange={(e) => setNewBucketLabel(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleAddBucket();
+                  }}
                 />
               </div>
             </div>
