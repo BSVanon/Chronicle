@@ -301,8 +301,12 @@ export default function HomePage() {
           </CardHeader>
           <CardContent className="space-y-2">
             <p className="text-2xl font-bold">{headerCount.toLocaleString()}</p>
-            <p className="text-xs text-muted-foreground">
+            <p 
+              className="text-xs text-muted-foreground cursor-help"
+              title={tipHeight ? `The highest block header stored locally. Used to verify BEEF proofs.` : `No headers synced yet. Go to Validation → Sync Headers to download block headers for local proof verification.`}
+            >
               Tip: {tipHeight?.toLocaleString() ?? "none"}
+              {!tipHeight && <span className="ml-1 text-yellow-600 dark:text-yellow-400">(sync needed)</span>}
             </p>
             <Button asChild variant="outline" size="sm" className="w-full">
               <Link href="/validation">Sync Headers</Link>

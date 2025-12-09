@@ -9,6 +9,7 @@ import { useNetworkMode } from "@/contexts/network-mode-context";
 import type { UtxoDossier, ProofArchive, Bucket } from "@/core/dossier/types";
 import { computeBeefHash } from "@/core/dossier/beef-store";
 import { fetchRawTx, assembleBeefFromTxid } from "@/core/net/providers";
+import { Transaction } from "@bsv/sdk";
 
 import { WizardStepInput } from "./WizardStepInput";
 import { WizardStepSelect } from "./WizardStepSelect";
@@ -142,8 +143,36 @@ export function UtxoWizard({ buckets, existingOutpoints }: UtxoWizardProps) {
       try {
         const parsedOutputs = parseRawTxOutputs(value);
         const computedTxid = computeTxidFromHex(value);
+        
+        if (!computedTxid) {
+          setError("Failed to parse raw transaction hex. Please check the format.");
+          return;
+        }
+        
         setTxid(computedTxid);
         setOutputs(parsedOutputs);
+        
+        // If online, try to fetch BEEF for this txid
+        if (mode === "online_shielded") {
+          setFetching(true);
+          setFetchStatus("Fetching BEEF proof for transaction...");
+          try {
+            const result = await assembleBeefFromTxid(computedTxid);
+            if (result) {
+              setBeefBase64(btoa(String.fromCharCode(...hexToBytes(result.beefHex))));
+              setHeight(result.height);
+              setFetchStatus(`Fetched BEEF proof (block ${result.height.toLocaleString()})`);
+            } else {
+              setFetchStatus("Could not fetch BEEF proof. You can still save the UTXO.");
+            }
+          } catch (e) {
+            console.error("[rawtx] BEEF fetch error:", e);
+            setFetchStatus("BEEF fetch failed. You can still save the UTXO.");
+          } finally {
+            setFetching(false);
+          }
+        }
+        
         setStep("select-output");
       } catch (e) {
         setError(`Failed to parse raw tx: ${e instanceof Error ? e.message : "Unknown"}`);
@@ -322,36 +351,18 @@ function parseRawTxOutputs(rawTxHex: string): ParsedOutput[] {
   const outputs: ParsedOutput[] = [];
   
   try {
-    const bytes = hexToBytes(rawTxHex);
-    let offset = 4;
-    
-    const inputCount = bytes[offset];
-    offset++;
-    for (let i = 0; i < inputCount; i++) {
-      offset += 36;
-      const scriptLen = bytes[offset];
-      offset += 1 + scriptLen + 4;
+    // Use BSV SDK for proper parsing
+    const tx = Transaction.fromHex(rawTxHex);
+    for (let i = 0; i < tx.outputs.length; i++) {
+      const out = tx.outputs[i];
+      outputs.push({
+        vout: i,
+        satoshis: out.satoshis ?? 0,
+        script_hex: out.lockingScript.toHex(),
+      });
     }
-    
-    const outputCount = bytes[offset];
-    offset++;
-    for (let i = 0; i < outputCount; i++) {
-      let satoshis = 0;
-      for (let j = 0; j < 8; j++) {
-        satoshis += bytes[offset + j] * Math.pow(256, j);
-      }
-      offset += 8;
-      
-      const scriptLen = bytes[offset];
-      offset++;
-      const scriptHex = Array.from(bytes.slice(offset, offset + scriptLen))
-        .map(b => b.toString(16).padStart(2, '0'))
-        .join('');
-      offset += scriptLen;
-      
-      outputs.push({ vout: i, satoshis, script_hex: scriptHex });
-    }
-  } catch {
+  } catch (e) {
+    console.error("[parseRawTxOutputs] Failed to parse raw tx:", e);
     // Return empty if parsing fails
   }
   
@@ -359,6 +370,13 @@ function parseRawTxOutputs(rawTxHex: string): ParsedOutput[] {
 }
 
 function computeTxidFromHex(rawTxHex: string): string {
-  // Placeholder - in production use @bsv/sdk
-  return rawTxHex.slice(0, 64).toLowerCase();
+  try {
+    // Use BSV SDK to properly parse and compute txid (double-SHA256, reversed)
+    const tx = Transaction.fromHex(rawTxHex);
+    return tx.id("hex");
+  } catch (e) {
+    console.error("[computeTxidFromHex] Failed to parse raw tx:", e);
+    // Return empty string to indicate failure
+    return "";
+  }
 }
