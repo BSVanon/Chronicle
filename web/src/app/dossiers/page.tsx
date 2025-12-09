@@ -16,6 +16,7 @@ import type { UtxoDossier, ProofArchive } from "@/core/dossier/types";
 import { getHeaderByHeight } from "@/core/headers/store";
 import { Beef } from "@bsv/sdk";
 import { Label } from "@/components/ui/label";
+import JSZip from "jszip";
 
 type SortOption = "newest" | "oldest" | "value-high" | "value-low" | "label-asc" | "label-desc";
 
@@ -313,8 +314,38 @@ export default function DossiersPage() {
         result.set(iv, salt.length);
         result.set(new Uint8Array(encrypted_data), salt.length + iv.length);
         
-        blob = new Blob([result], { type: "application/octet-stream" });
-        filename = `chronicle-utxos-${selected.size}-${new Date().toISOString().slice(0, 10)}.enc`;
+        // Create zip with encrypted file + decryption tool
+        const zip = new JSZip();
+        const baseName = `chronicle-utxos-${selected.size}-${new Date().toISOString().slice(0, 10)}`;
+        zip.file(`${baseName}.enc`, result);
+        
+        // Fetch and include the decryption tool
+        const decryptToolResponse = await fetch("/decrypt-tool.html");
+        const decryptToolHtml = await decryptToolResponse.text();
+        zip.file("decrypt-tool.html", decryptToolHtml);
+        
+        // Add a README
+        zip.file("README.txt", `Chronicle Cold Vault - Encrypted Export
+========================================
+
+This archive contains:
+- ${baseName}.enc - Your encrypted UTXO data
+- decrypt-tool.html - Standalone decryption tool
+
+To decrypt:
+1. Open decrypt-tool.html in any modern web browser
+2. Select the .enc file
+3. Enter your passphrase
+4. Download the decrypted JSON
+
+Encryption: AES-256-GCM with PBKDF2 (100,000 iterations, SHA-256)
+
+Exported: ${new Date().toISOString()}
+UTXOs: ${selected.size}
+`);
+        
+        blob = await zip.generateAsync({ type: "blob" });
+        filename = `${baseName}-encrypted.zip`;
       } else {
         blob = new Blob([json], { type: "application/json" });
         filename = `chronicle-utxos-${selected.size}-${new Date().toISOString().slice(0, 10)}.json`;
@@ -385,15 +416,7 @@ export default function DossiersPage() {
                     autoComplete="new-password"
                   />
                   <p className="text-xs text-muted-foreground">
-                    💡 Save the{" "}
-                    <a 
-                      href="/decrypt-tool.html" 
-                      target="_blank" 
-                      className="text-primary underline"
-                    >
-                      standalone decryption tool
-                    </a>{" "}
-                    alongside your encrypted backup for future access without Chronicle.
+                    � Encrypted exports include a standalone decryption tool in the .zip for future-proof access.
                   </p>
                 </div>
               )}

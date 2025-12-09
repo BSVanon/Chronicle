@@ -15,6 +15,7 @@ import { useHeaderStore } from "@/contexts/header-store-context";
 import { exportHeaderStore, importHeaderStore } from "@/core/headers/store";
 import { markExportPerformed, saveDossiersBatch } from "@/core/dossier/store";
 import type { UtxoDossier, ProofArchive, Bucket } from "@/core/dossier/types";
+import JSZip from "jszip";
 
 type ArchiveData = {
   version: number;
@@ -147,17 +148,48 @@ export default function ExportPage() {
       result.set(iv, salt.length);
       result.set(new Uint8Array(encrypted), salt.length + iv.length);
 
-      const blob = new Blob([result], { type: "application/octet-stream" });
+      // Create zip with encrypted file + decryption tool
+      const zip = new JSZip();
+      const baseName = `chronicle-archive-${new Date().toISOString().slice(0, 10)}`;
+      zip.file(`${baseName}.enc`, result);
+      
+      // Fetch and include the decryption tool
+      const decryptToolResponse = await fetch("/decrypt-tool.html");
+      const decryptToolHtml = await decryptToolResponse.text();
+      zip.file("decrypt-tool.html", decryptToolHtml);
+      
+      // Add a README
+      zip.file("README.txt", `Chronicle Cold Vault - Encrypted Full Backup
+=============================================
+
+This archive contains:
+- ${baseName}.enc - Your encrypted Chronicle data (dossiers, BEEF proofs, headers)
+- decrypt-tool.html - Standalone decryption tool
+
+To decrypt:
+1. Open decrypt-tool.html in any modern web browser
+2. Select the .enc file
+3. Enter your passphrase
+4. Download the decrypted JSON
+
+Encryption: AES-256-GCM with PBKDF2 (100,000 iterations, SHA-256)
+
+Exported: ${new Date().toISOString()}
+Dossiers: ${dossiers.length}
+BEEF Archives: ${archives.length}
+`);
+
+      const blob = await zip.generateAsync({ type: "blob" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `chronicle-archive-${new Date().toISOString().slice(0, 10)}.enc`;
+      a.download = `${baseName}-encrypted.zip`;
       a.click();
       URL.revokeObjectURL(url);
 
       // Mark export performed for reminder tracking
       markExportPerformed(dossiers.length);
-      setStatus("Encrypted archive exported successfully.");
+      setStatus("Encrypted archive exported successfully (zip with decryption tool).");
       setPassphrase("");
     } catch (e) {
       setStatus(`Encryption error: ${e instanceof Error ? e.message : "Unknown"}`);
@@ -434,6 +466,13 @@ export default function ExportPage() {
             )}
           </div>
           <Button onClick={handleExportEncrypted}>Export Encrypted</Button>
+          <p className="text-xs text-muted-foreground">
+            📦 Encrypted exports are bundled as a .zip with a standalone{" "}
+            <a href="/decrypt-tool.html" target="_blank" className="text-primary underline">
+              decryption tool
+            </a>{" "}
+            for future-proof access without Chronicle.
+          </p>
         </CardContent>
       </Card>
 
