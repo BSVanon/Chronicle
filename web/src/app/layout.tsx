@@ -8,6 +8,7 @@ import { HeaderStoreProvider } from "@/contexts/header-store-context";
 import { DossierProvider } from "@/contexts/dossier-context";
 import { BeefStoreProvider } from "@/contexts/beef-store-context";
 import { ChronicleLogoMark } from "@/components/chronicle-logo";
+import { ErrorBoundary } from "@/components/error-boundary";
 import { NetworkModeToggle } from "@/components/network-mode-toggle";
 import { ThemeModeToggle } from "@/components/theme-mode-toggle";
 import { TipJarButton } from "@/components/tip-jar";
@@ -53,6 +54,7 @@ export default function RootLayout({
             <HeaderStoreProvider>
               <DossierProvider>
                 <BeefStoreProvider>
+                  <ErrorBoundary>
                   <div className="flex min-h-screen flex-col">
                     <header className="sticky top-0 z-40 border-b bg-card">
                       <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3">
@@ -127,6 +129,7 @@ export default function RootLayout({
                       </div>
                     </footer>
                   </div>
+                  </ErrorBoundary>
                 </BeefStoreProvider>
               </DossierProvider>
             </HeaderStoreProvider>

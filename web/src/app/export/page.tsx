@@ -13,7 +13,7 @@ import { useDossiers } from "@/contexts/dossier-context";
 import { useBeefStore } from "@/contexts/beef-store-context";
 import { useHeaderStore } from "@/contexts/header-store-context";
 import { exportHeaderStore, importHeaderStore } from "@/core/headers/store";
-import { markExportPerformed } from "@/core/dossier/store";
+import { markExportPerformed, saveDossiersBatch } from "@/core/dossier/store";
 import type { UtxoDossier, ProofArchive, Bucket } from "@/core/dossier/types";
 
 type ArchiveData = {
@@ -27,7 +27,7 @@ type ArchiveData = {
 };
 
 export default function ExportPage() {
-  const { dossiers, buckets, save: saveDossier, replaceBuckets, refresh: refreshDossiers } = useDossiers();
+  const { dossiers, buckets, replaceBuckets, refresh: refreshDossiers } = useDossiers();
   const { archives, index, save: saveBeef, refresh: refreshBeef } = useBeefStore();
   const { refresh: refreshHeaders } = useHeaderStore();
 
@@ -297,12 +297,10 @@ export default function ExportPage() {
       }
     }
 
-    // Import dossiers
-    if (Array.isArray(archive.dossiers)) {
-      for (const dossier of archive.dossiers) {
-        await saveDossier(dossier);
-        importedDossiers++;
-      }
+    // Import dossiers (use batch for efficiency)
+    if (Array.isArray(archive.dossiers) && archive.dossiers.length > 0) {
+      await saveDossiersBatch(archive.dossiers);
+      importedDossiers = archive.dossiers.length;
     }
 
     // Import buckets

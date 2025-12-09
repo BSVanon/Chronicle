@@ -223,32 +223,90 @@ export async function getDossier(outpoint: string): Promise<UtxoDossier | null> 
 export async function saveDossier(dossier: UtxoDossier): Promise<void> {
   storeLog("saveDossier: saving", dossier.outpoint);
   const db = await openDb();
-  return new Promise((resolve, reject) => {
+  
+  // First, save the dossier
+  await new Promise<void>((resolve, reject) => {
     const tx = db.transaction(DOSSIER_STORE, "readwrite");
     const store = tx.objectStore(DOSSIER_STORE);
     const request = store.put(dossier);
     request.onsuccess = () => {
       storeLog("saveDossier: saved", dossier.outpoint);
-      resolve();
     };
     request.onerror = () => {
       console.error("[Chronicle Dossier Store] saveDossier error:", request.error, "outpoint:", dossier.outpoint);
       reject(request.error);
     };
+    tx.oncomplete = () => {
+      storeLog("saveDossier: transaction complete for", dossier.outpoint);
+      resolve();
+    };
     tx.onerror = () => {
       console.error("[Chronicle Dossier Store] saveDossier transaction error:", tx.error);
-    };
-    tx.oncomplete = async () => {
-      storeLog("saveDossier: transaction complete for", dossier.outpoint);
-      // Trigger backup after successful save
-      try {
-        const allDossiers = await getAllDossiers();
-        await backupToLocalStorage(allDossiers);
-      } catch (e) {
-        console.warn("[Chronicle] Post-save backup failed:", e);
-      }
+      reject(tx.error);
     };
   });
+  
+  // Then, trigger backup in a separate operation (non-blocking)
+  // Use setTimeout to ensure we're fully out of the transaction context
+  setTimeout(async () => {
+    try {
+      const allDossiers = await getAllDossiers();
+      await backupToLocalStorage(allDossiers);
+    } catch (e) {
+      console.warn("[Chronicle] Post-save backup failed:", e);
+    }
+  }, 0);
+}
+
+/**
+ * Save multiple dossiers in batch (for imports).
+ * Only triggers backup once at the end.
+ */
+export async function saveDossiersBatch(dossiers: UtxoDossier[]): Promise<void> {
+  if (dossiers.length === 0) return;
+  
+  storeLog("saveDossiersBatch: saving", dossiers.length, "dossiers");
+  const db = await openDb();
+  
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(DOSSIER_STORE, "readwrite");
+    const store = tx.objectStore(DOSSIER_STORE);
+    
+    let completed = 0;
+    let hasError = false;
+    
+    for (const dossier of dossiers) {
+      const request = store.put(dossier);
+      request.onsuccess = () => {
+        completed++;
+      };
+      request.onerror = () => {
+        if (!hasError) {
+          hasError = true;
+          console.error("[Chronicle Dossier Store] saveDossiersBatch error:", request.error);
+        }
+      };
+    }
+    
+    tx.oncomplete = () => {
+      storeLog("saveDossiersBatch: saved", completed, "of", dossiers.length, "dossiers");
+      resolve();
+    };
+    tx.onerror = () => {
+      console.error("[Chronicle Dossier Store] saveDossiersBatch transaction error:", tx.error);
+      reject(tx.error);
+    };
+  });
+  
+  // Trigger backup once at the end
+  setTimeout(async () => {
+    try {
+      const allDossiers = await getAllDossiers();
+      await backupToLocalStorage(allDossiers);
+    } catch (e) {
+      console.warn("[Chronicle] Post-batch backup failed:", e);
+    }
+  }, 0);
 }
 
 /**
