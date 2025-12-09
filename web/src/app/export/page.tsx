@@ -13,6 +13,7 @@ import { useDossiers } from "@/contexts/dossier-context";
 import { useBeefStore } from "@/contexts/beef-store-context";
 import { useHeaderStore } from "@/contexts/header-store-context";
 import { exportHeaderStore, importHeaderStore } from "@/core/headers/store";
+import { markExportPerformed } from "@/core/dossier/store";
 import type { UtxoDossier, ProofArchive, Bucket } from "@/core/dossier/types";
 
 type ArchiveData = {
@@ -76,6 +77,8 @@ export default function ExportPage() {
       a.click();
       URL.revokeObjectURL(url);
 
+      // Mark export performed for reminder tracking
+      markExportPerformed(dossiers.length);
       setStatus("Archive exported successfully (unencrypted).");
     } catch (e) {
       setStatus(`Export error: ${e instanceof Error ? e.message : "Unknown"}`);
@@ -152,6 +155,8 @@ export default function ExportPage() {
       a.click();
       URL.revokeObjectURL(url);
 
+      // Mark export performed for reminder tracking
+      markExportPerformed(dossiers.length);
       setStatus("Encrypted archive exported successfully.");
       setPassphrase("");
     } catch (e) {

@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import Link from "next/link";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,6 +11,7 @@ import { useDossiers } from "@/contexts/dossier-context";
 import { useBeefStore } from "@/contexts/beef-store-context";
 import { useHeaderStore } from "@/contexts/header-store-context";
 import { useNetworkMode } from "@/contexts/network-mode-context";
+import { checkExportReminder, getStorageQuota, getBackupMeta } from "@/core/dossier/store";
 
 // Color map for progress bars (using hex for light mode visibility)
 const colorMap: Record<string, string> = {
@@ -50,6 +52,30 @@ export default function HomePage() {
   const { tipHeight, headerCount } = useHeaderStore();
   const { mode } = useNetworkMode();
 
+  // Storage and backup state
+  const [storageQuota, setStorageQuota] = React.useState<{ used: number; quota: number; percent: number } | null>(null);
+  const [exportReminder, setExportReminder] = React.useState<{ shouldRemind: boolean; addedSince: number } | null>(null);
+  const [backupMeta, setBackupMeta] = React.useState<{ count: number; timestamp: string } | null>(null);
+  const [dismissedReminder, setDismissedReminder] = React.useState(false);
+
+  // Check storage quota and export reminder on load and when dossiers change
+  React.useEffect(() => {
+    const checkStorage = async () => {
+      const quota = await getStorageQuota();
+      setStorageQuota(quota);
+      
+      const reminder = checkExportReminder(dossiers.length);
+      setExportReminder(reminder);
+      
+      const backup = getBackupMeta();
+      setBackupMeta(backup);
+    };
+    
+    if (!loading) {
+      checkStorage();
+    }
+  }, [dossiers.length, loading]);
+
   // Compute totals
   const totalSatoshis = summaries.reduce((sum, s) => sum + s.total_satoshis, 0);
   const totalDossiers = dossiers.length;
@@ -85,6 +111,61 @@ export default function HomePage() {
           </Badge>
         </div>
       </div>
+
+      {/* Storage Warning - show when storage is above 80% */}
+      {storageQuota && storageQuota.percent > 80 && (
+        <Card className="border-red-500/50 bg-red-500/10">
+          <CardContent className="py-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-red-600 dark:text-red-400">⚠️</span>
+                <div>
+                  <p className="text-sm font-medium text-red-700 dark:text-red-400">
+                    Storage {storageQuota.percent.toFixed(0)}% Full
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {(storageQuota.used / 1024 / 1024).toFixed(1)} MB used of {(storageQuota.quota / 1024 / 1024).toFixed(0)} MB.
+                    Export a backup immediately to prevent data loss.
+                  </p>
+                </div>
+              </div>
+              <Button asChild size="sm" variant="destructive">
+                <Link href="/export">Export Now</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Export Reminder - show when 10+ UTXOs added since last export */}
+      {exportReminder?.shouldRemind && !dismissedReminder && totalDossiers > 0 && (
+        <Card className="border-yellow-500/50 bg-yellow-500/10">
+          <CardContent className="py-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-yellow-600 dark:text-yellow-400">💾</span>
+                <div>
+                  <p className="text-sm font-medium text-yellow-700 dark:text-yellow-400">
+                    Backup Reminder
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    You&apos;ve added {exportReminder.addedSince} UTXO{exportReminder.addedSince !== 1 ? "s" : ""} since your last export.
+                    {backupMeta && ` Auto-backup: ${backupMeta.count} dossiers saved to localStorage.`}
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" variant="ghost" onClick={() => setDismissedReminder(true)}>
+                  Dismiss
+                </Button>
+                <Button asChild size="sm" variant="outline">
+                  <Link href="/export">Export</Link>
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Getting Started - show when no dossiers */}
       {!loading && totalDossiers === 0 && (

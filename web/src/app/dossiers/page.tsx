@@ -12,8 +12,42 @@ import { Input } from "@/components/ui/input";
 import { useDossiers } from "@/contexts/dossier-context";
 import { useBeefStore } from "@/contexts/beef-store-context";
 import type { UtxoDossier, ProofArchive } from "@/core/dossier/types";
+import { Beef } from "@bsv/sdk";
 
 type SortOption = "newest" | "oldest" | "value-high" | "value-low" | "label-asc" | "label-desc";
+
+// Extract proof details from BEEF
+function getBeefDetails(beefBase64: string): { 
+  txCount: number; 
+  merkleDepth: number; 
+  txSize: number;
+  inputCount: number;
+  outputCount: number;
+} | null {
+  try {
+    const beef = Beef.fromString(beefBase64, "base64");
+    const validTxids = beef.getValidTxids();
+    const subjectTxid = validTxids[validTxids.length - 1];
+    
+    // Find the subject transaction
+    const subjectTx = beef.txs.find(t => t.tx?.id("hex") === subjectTxid);
+    const tx = subjectTx?.tx;
+    
+    // Get merkle path depth
+    const merklePath = beef.findBump(subjectTxid);
+    const merkleDepth = merklePath?.path?.length ?? 0;
+    
+    return {
+      txCount: beef.txs.length,
+      merkleDepth,
+      txSize: tx?.toBinary().length ?? 0,
+      inputCount: tx?.inputs.length ?? 0,
+      outputCount: tx?.outputs.length ?? 0,
+    };
+  } catch {
+    return null;
+  }
+}
 
 export default function DossiersPage() {
   const { dossiers, buckets, loading, remove, refresh } = useDossiers();
@@ -25,6 +59,23 @@ export default function DossiersPage() {
   const [sort, setSort] = React.useState<SortOption>("newest");
   const [selected, setSelected] = React.useState<Set<string>>(new Set());
   const [selectMode, setSelectMode] = React.useState(false);
+  const [expanded, setExpanded] = React.useState<Set<string>>(new Set());
+
+  const toggleExpanded = (outpoint: string) => {
+    const newExpanded = new Set(expanded);
+    if (newExpanded.has(outpoint)) {
+      newExpanded.delete(outpoint);
+    } else {
+      newExpanded.add(outpoint);
+    }
+    setExpanded(newExpanded);
+  };
+
+  // Get archive for a dossier
+  const getArchive = (dossier: UtxoDossier): ProofArchive | undefined => {
+    if (!dossier.beef_hash) return undefined;
+    return archives.find(a => a.beef_hash === dossier.beef_hash);
+  };
 
   const filteredDossiers = React.useMemo(() => {
     let result = dossiers;
@@ -320,11 +371,16 @@ export default function DossiersPage() {
           <p className="text-sm text-muted-foreground">No dossiers found.</p>
         ) : (
           <div className="space-y-2">
-            {filteredDossiers.map((dossier) => (
+            {filteredDossiers.map((dossier) => {
+              const archive = getArchive(dossier);
+              const isExpanded = expanded.has(dossier.outpoint);
+              const beefDetails = isExpanded && archive ? getBeefDetails(archive.beef) : null;
+              
+              return (
               <Card 
                 key={dossier.outpoint} 
-                className={`bg-card/60 ${selectMode ? "cursor-pointer" : ""} ${selected.has(dossier.outpoint) ? "ring-2 ring-primary" : ""}`}
-                onClick={selectMode ? () => toggleSelect(dossier.outpoint) : undefined}
+                className={`bg-card/60 transition-all ${selectMode ? "cursor-pointer" : "cursor-pointer hover:bg-card/80"} ${selected.has(dossier.outpoint) ? "ring-2 ring-primary" : ""}`}
+                onClick={selectMode ? () => toggleSelect(dossier.outpoint) : () => toggleExpanded(dossier.outpoint)}
               >
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between gap-4">
@@ -337,7 +393,10 @@ export default function DossiersPage() {
                       />
                     )}
                     <div className="min-w-0 flex-1 space-y-1">
-                      <code className="block truncate text-xs">{dossier.outpoint}</code>
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground text-xs">{isExpanded ? "▼" : "▶"}</span>
+                        <code className="block truncate text-xs">{dossier.outpoint}</code>
+                      </div>
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-medium">
                           {(dossier.value_satoshis / 1e8).toFixed(8)} BSV
@@ -384,19 +443,76 @@ export default function DossiersPage() {
                       <p className="text-xs text-muted-foreground">
                         Added: {new Date(dossier.created_at).toLocaleDateString()}
                       </p>
+                      
+                      {/* Expanded Proof Details */}
+                      {isExpanded && (
+                        <div className="mt-3 pt-3 border-t border-border/50 space-y-2">
+                          <p className="text-xs font-medium text-muted-foreground">Proof Details</p>
+                          {archive ? (
+                            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                              <div>
+                                <span className="text-muted-foreground">Block Height:</span>{" "}
+                                <span className="font-mono">{archive.height.toLocaleString()}</span>
+                              </div>
+                              {beefDetails && (
+                                <>
+                                  <div>
+                                    <span className="text-muted-foreground">Merkle Depth:</span>{" "}
+                                    <span className="font-mono">{beefDetails.merkleDepth} levels</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-muted-foreground">Tx Size:</span>{" "}
+                                    <span className="font-mono">{beefDetails.txSize.toLocaleString()} bytes</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-muted-foreground">Inputs/Outputs:</span>{" "}
+                                    <span className="font-mono">{beefDetails.inputCount} / {beefDetails.outputCount}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-muted-foreground">BEEF Txs:</span>{" "}
+                                    <span className="font-mono">{beefDetails.txCount}</span>
+                                  </div>
+                                </>
+                              )}
+                              {dossier.verified?.ok && (
+                                <div className="col-span-2">
+                                  <span className="text-muted-foreground">Verified:</span>{" "}
+                                  <span className="font-mono text-green-600 dark:text-green-400">
+                                    ✓ at height {dossier.verified.at_height.toLocaleString()}
+                                  </span>
+                                </div>
+                              )}
+                              {archive.header_hash && (
+                                <div className="col-span-2">
+                                  <span className="text-muted-foreground">Block Hash:</span>{" "}
+                                  <code className="font-mono text-[10px] break-all">{archive.header_hash.slice(0, 16)}...{archive.header_hash.slice(-16)}</code>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <p className="text-xs text-muted-foreground italic">
+                              No BEEF proof stored. Go to Validation to fetch.
+                            </p>
+                          )}
+                        </div>
+                      )}
                     </div>
                     <Button
                       variant="ghost"
                       size="sm"
                       className="text-red-500 hover:text-red-600"
-                      onClick={() => handleDelete(dossier.outpoint)}
+                      onClick={(e: React.MouseEvent) => {
+                        e.stopPropagation();
+                        handleDelete(dossier.outpoint);
+                      }}
                     >
                       Delete
                     </Button>
                   </div>
                 </CardContent>
               </Card>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
